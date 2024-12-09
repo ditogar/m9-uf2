@@ -1,4 +1,6 @@
-package p4;
+package p4.ex4;
+
+import p4.Ratoli;
 
 class Main {
     public static void main(String[] args) {
@@ -15,7 +17,7 @@ class Main {
         tjer.start();
 
         try {
-            Thread.sleep(100);
+            Thread.sleep(10);
             mic.setStop(true);
         } catch (Exception e) {
             System.out.println("Error");

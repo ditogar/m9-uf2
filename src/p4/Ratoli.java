@@ -9,6 +9,11 @@ public class Ratoli implements Runnable{
 
     //Contructors, getters i setters...
 
+
+    public String getNom() {
+        return nom;
+    }
+
     public void menja(){
         System.out.println("El ratolí " + nom + " ha començat a menjar");
         System.out.println("El ratolí " + nom + " està menjant");
