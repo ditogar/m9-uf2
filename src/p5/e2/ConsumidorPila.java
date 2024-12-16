@@ -1,7 +1,5 @@
 package p5.e2;
 
-import p5.MyStack;
-
 public class ConsumidorPila implements Runnable {
     private MyStack stack;
 
@@ -11,14 +9,14 @@ public class ConsumidorPila implements Runnable {
 
     @Override
     public void run() {
-        do {
+        while (true) {
             stack.pop();
-            System.out.println("Consumidor " + stack);
+            System.out.println("Consumidor: " + stack);
             try {
                 Thread.sleep(100);
             } catch (Exception e) {
-                System.out.println("Se ha producido un error.");
+                e.printStackTrace();
             }
-        } while (stack.getIdx() != -1);
+        }
     }
 }

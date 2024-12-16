@@ -1,6 +1,7 @@
 package p4.ex4;
 
 import p4.Ratoli;
+import p4.RatoliStoppable;
 
 class Main {
     public static void main(String[] args) {
@@ -15,12 +16,5 @@ class Main {
         tmic.start();
         tmin.start();
         tjer.start();
-
-        try {
-            Thread.sleep(10);
-            mic.setStop(true);
-        } catch (Exception e) {
-            System.out.println("Error");
-        }
     }
 }

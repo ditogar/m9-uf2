@@ -1,15 +1,9 @@
 package p5.e3;
 
-import java.util.Arrays;
-
 public class MySynchronizedStack {
-    private int idx = 0;
+    private int idx = 0; //Apunta a la seguent posicio lliure
     private Character[] data = new Character[MAX_SIZE];
     public static final int MAX_SIZE = 12;
-
-    public int getIdx() {
-        return idx;
-    }
 
     public void push(Character c){
         synchronized (this) {
@@ -21,21 +15,23 @@ public class MySynchronizedStack {
     }
 
     public Character pop(){
-        Character value = null;
         synchronized (this) {
+            Character value = null;
             if (idx > 0) {
                 idx--;
                 value = data[idx];
                 data[idx] = null;
             }
+            return value;
         }
-        return value;
     }
 
     @Override
     public String toString() {
-        return "MyStack{" +
-                "data=" + Arrays.toString(data) +
-                '}';
+        StringBuilder sb = new StringBuilder();
+        for (Character c : data) {
+            sb.append(c + " | ");
+        }
+        return sb.toString();
     }
 }

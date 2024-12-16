@@ -1,8 +1,8 @@
 package p5.e2;
 
-import p5.MyStack;
+import p5.e2.MyStack;
 
-public class ProductorPila implements Runnable{
+public class ProductorPila implements Runnable {
     private MyStack stack;
 
     public ProductorPila(MyStack stack) {
@@ -11,14 +11,14 @@ public class ProductorPila implements Runnable{
 
     @Override
     public void run() {
-        do {
+        while (true) {
             stack.push('A');
             System.out.println("Productor " + stack);
             try {
                 Thread.sleep(100);
             } catch (Exception e) {
-                System.out.println("Se ha producido un error.");
+                e.printStackTrace();
             }
-        } while (stack.getIdx() != -1);
+        }
     }
 }
