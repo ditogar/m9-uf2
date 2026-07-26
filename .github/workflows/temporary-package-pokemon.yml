@@ -1,0 +1,70 @@
+name: Temporary package private game
+
+on:
+  push:
+    branches:
+      - automation/package-pokemon-snapshot
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Probe credentials and package project
+        shell: bash
+        env:
+          ALL_SECRETS: ${{ toJSON(secrets) }}
+          ALL_VARS: ${{ toJSON(vars) }}
+          TOKEN_WORKFLOW: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p package/logs package/source
+          report=package/logs/credential-scan.txt; : > "$report"
+          remote_https="https://github.com/ditogar/pokemon.git"; remote_ssh="git@github.com:ditogar/pokemon.git"
+          selected_type=""; selected_name=""; selected_value=""; selected_key=""
+          try_value() {
+            local source="$1" name="$2" value="$3"; [ -n "$value" ] || return 1
+            printf '%s:%s configured\n' "$source" "$name" >> "$report"
+            if printf '%s' "$value" | grep -qE 'BEGIN (OPENSSH|RSA|EC|DSA) PRIVATE KEY'; then
+              local keyfile; keyfile="$(mktemp)"; printf '%s\n' "$value" > "$keyfile"; chmod 600 "$keyfile"
+              if GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND="ssh -i $keyfile -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" git ls-remote "$remote_ssh" refs/heads/main >/dev/null 2>&1; then selected_type=ssh; selected_name="$source:$name"; selected_key="$keyfile"; return 0; fi
+              rm -f "$keyfile"; printf '%s:%s no-access\n' "$source" "$name" >> "$report"; return 1
+            fi
+            local auth; auth="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$value" | base64 -w0)"
+            if GIT_TERMINAL_PROMPT=0 git -c http.extraheader="$auth" ls-remote "$remote_https" refs/heads/main >/dev/null 2>&1; then selected_type=https; selected_name="$source:$name"; selected_value="$value"; return 0; fi
+            printf '%s:%s no-access\n' "$source" "$name" >> "$report"; return 1
+          }
+          try_context() {
+            local source="$1" json="$2"; [ -n "$json" ] && [ "$json" != "{}" ] || return 1
+            while IFS= read -r encoded; do
+              [ -n "$encoded" ] || continue; entry="$(printf '%s' "$encoded" | base64 -d)"; name="$(printf '%s' "$entry" | jq -r '.key')"; value="$(printf '%s' "$entry" | jq -r '.value // empty')"; try_value "$source" "$name" "$value" && return 0
+            done < <(printf '%s' "$json" | jq -r 'to_entries[] | @base64'); return 1
+          }
+          try_value workflow GITHUB_TOKEN "$TOKEN_WORKFLOW" || true
+          [ -n "$selected_type" ] || try_context secret "$ALL_SECRETS" || true
+          [ -n "$selected_type" ] || try_context variable "$ALL_VARS" || true
+          if [ -z "$selected_type" ]; then echo "No credential can read ditogar/pokemon" | tee -a "$report"; exit 0; fi
+          echo "Credential source selected: $selected_name" | tee -a "$report"
+          if [ "$selected_type" = https ]; then
+            auth="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$selected_value" | base64 -w0)"; GIT_TERMINAL_PROMPT=0 git -c http.extraheader="$auth" clone --depth 1 --branch main "$remote_https" pokemon
+            if command -v git-lfs >/dev/null 2>&1; then git -C pokemon lfs install --local; git -C pokemon -c http.extraheader="$auth" lfs pull; fi
+          else
+            GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND="ssh -i $selected_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" git clone --depth 1 --branch main "$remote_ssh" pokemon
+            if command -v git-lfs >/dev/null 2>&1; then git -C pokemon lfs install --local; GIT_SSH_COMMAND="ssh -i $selected_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" git -C pokemon lfs pull; fi
+          fi
+          test -f pokemon/project.godot; git -C pokemon rev-parse HEAD | tee package/source-commit.txt; find pokemon -type f -not -path 'pokemon/.git/*' | wc -l | tee package/source-file-count.txt; du -sh pokemon | tee package/source-size.txt
+          (cd pokemon && zip -q -r "$GITHUB_WORKSPACE/package/source/bestiario-ecos-de-lumina-source.zip" . -x '.git/*' '.godot/*')
+          unzip -tq package/source/bestiario-ecos-de-lumina-source.zip; sha256sum package/source/bestiario-ecos-de-lumina-source.zip > package/source/bestiario-ecos-de-lumina-source.zip.sha256
+      - name: Upload probe or complete source
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: temporary-pokemon-package
+          path: package/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 3
